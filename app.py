@@ -99,6 +99,45 @@ span[data-baseweb="tag"]:hover {
     color: #3C2F00 !important;              /* Deep brown text */
     font-weight: 600 !important;
 }
+/* 🔥 FULL GOLD SLIDER FIX — ALL BROWSERS & DEPLOYMENT */
+.stSlider input[type="range"]::-webkit-slider-runnable-track {
+    background: #D4AF37 !important;      /* Gold active track */
+    height: 6px !important;
+    border-radius: 5px !important;
+}
+
+.stSlider input[type="range"]::-moz-range-track {
+    background: #D4AF37 !important;
+    height: 6px !important;
+    border-radius: 5px !important;
+}
+
+.stSlider input[type="range"]::-ms-track {
+    background: #D4AF37 !important;
+    height: 6px !important;
+    border-radius: 5px !important;
+    border-color: transparent;
+    color: transparent;
+}
+
+/* inactive section becomes light gold */
+.stSlider input[type="range"]::-webkit-slider-runnable-track:before {
+    background: #E8D8A0 !important;
+}
+
+[data-baseweb="slider"] div[role="presentation"] > div {
+    background-color: #D4AF37 !important;   /* Gold — active segment */
+}
+[data-baseweb="slider"] div[role="presentation"] {
+    background-color: #EAD88C !important;   /* Light gold — inactive segment */
+}
+
+/* slider value labels (numbers) */
+.stSlider label span {
+    color: #3C2F00 !important;
+    font-weight: 700 !important;
+}
+
 
 
 </style>
@@ -1000,6 +1039,7 @@ with tab5:
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No products match your filters.")
+
 
 
 
