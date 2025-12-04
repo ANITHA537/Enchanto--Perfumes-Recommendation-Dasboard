@@ -27,7 +27,7 @@ st.markdown("""
     
     /* Reduce Top Padding */
     .block-container {
-        padding-top: 1rem;
+        padding-top: 4rem;
         padding-bottom: 1rem;
     }
     
@@ -136,9 +136,9 @@ with col_logo:
 with col_title:
     # Italic, smaller font to fit in one line
     st.markdown("""
-    <h2 style='font-style: italic; margin-top: 10px; font-size: 1.8rem;'>
+    <div style='font-style: italic; font-size: 1.5rem; line-height: 1.6; padding-top: 25px; padding-bottom: 10px; font-weight: 600; color: #0f172a;'>
         Enchanto – AI-Powered Recommendation Dashboard
-    </h2>
+    </div>
     """, unsafe_allow_html=True)
 st.caption("Collaborative • Content-Based • Hybrid | CLV • Engagement • Segmentation")
 
@@ -565,7 +565,7 @@ with tab1:
         with g2:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### Spend Distribution")
-            fig_hist = px.histogram(seg_users, x="total_spend", nbins=20, color_discrete_sequence=["#ef4444"])
+            fig_hist = px.histogram(seg_users, x="total_spend", nbins=20, color_discrete_sequence=["#d4af37"])
             fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Total Spend (₹)")
             st.plotly_chart(fig_hist, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
@@ -791,7 +791,7 @@ with tab3:
     st.markdown("#### 📉 Engagement Funnel (Segment)")
     fig_funnel = px.funnel(
         dict(number=[agg_views, agg_carts, agg_purchases], stage=["Views", "Add to Cart", "Purchases"]),
-        x='number', y='stage', color_discrete_sequence=["#ef4444"]
+        x='number', y='stage', color_discrete_sequence=["#d4af37"]
     )
     fig_funnel.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     
@@ -851,7 +851,7 @@ with tab4:
             seg_avg_clv = avg_peer_rev * mult + 5000
             
             diff = projected_clv - seg_avg_clv
-            color = "#10b981" if diff >= 0 else "#ef4444" # Green or Red
+            color = "#10b981" if diff >= 0 else "#d4af37" # Green or Gold
             
             st.markdown("---")
             st.markdown(f"**Vs. {u['persona']} Average**:")
