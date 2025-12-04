@@ -140,7 +140,7 @@ with col_title:
         Enchanto – AI-Powered Recommendation Dashboard
     </div>
     """, unsafe_allow_html=True)
-st.caption("Collaborative • Content-Based • Hybrid | CLV • Engagement • Segmentation")
+st.caption("Collaborative • Content-Based • Hybrid Recommendation Models | CLV • Engagement • Segmentation")
 
 # ======================================================================
 # LOAD PRODUCTS
@@ -1016,3 +1016,4 @@ with tab5:
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No products match your filters.")
+
