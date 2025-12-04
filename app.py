@@ -79,6 +79,27 @@ span[data-baseweb="tag"]:hover {
     background: #E2C15F !important;       /* Lighter gold hover */
     color: #2b2200 !important;
 }
+/* 🔥 GOLD SLIDER UPGRADE */
+.stSlider > div[data-baseweb="slider"] [role="slider"] {
+    background-color: #D4AF37 !important;   /* Gold thumb */
+    box-shadow: 0 0 6px rgba(212, 175, 55, 0.6) !important;
+    border: 2px solid #b8922b !important;
+}
+
+.stSlider > div[data-baseweb="slider"] div[role="presentation"] div {
+    background-color: #D4AF37 !important;   /* Gold active track */
+}
+
+.stSlider > div[data-baseweb="slider"] div[role="presentation"] {
+    background-color: #E8D8A0 !important;   /* Light-gold inactive segment */
+}
+
+/* Slider numbers (left & right values) */
+.stSlider label span {
+    color: #3C2F00 !important;              /* Deep brown text */
+    font-weight: 600 !important;
+}
+
 
 </style>
 """, unsafe_allow_html=True)
@@ -979,5 +1000,6 @@ with tab5:
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No products match your filters.")
+
 
 
