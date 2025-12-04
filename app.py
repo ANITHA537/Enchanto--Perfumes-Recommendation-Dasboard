@@ -57,23 +57,29 @@ st.markdown("""
     }
 
     /* ---------------------- GOLDEN MULTISELECT TAGS ---------------------- */
-    div[data-baseweb="tag"] {
-        background-color: #D4AF37 !important;
-        color: #3C2F00 !important;
-        border-radius: 6px !important;
-        border: 1px solid #b8922b !important;
-        font-weight: 600 !important;
-    }
-    div[data-baseweb="tag"] svg { fill: #3C2F00 !important; }
-    div[data-baseweb="tag"]:hover {
-        background-color: #E2C15F !important;
-        color: #2b2200 !important;
-    }
-    div[data-baseweb="tag"] > div {
-        font-size: 0.78rem !important;
-        padding-top: 1px;
-        padding-bottom: 1px;
-    }
+    /* 🔥 FINAL OVERRIDE — Gold filter tags globally (Cloud-safe) */
+div[data-baseweb="tag"], 
+span[data-baseweb="tag"] {
+    background: #D4AF37 !important;       /* Gold */
+    color: #3C2F00 !important;            /* Deep brown text */
+    border-radius: 6px !important;
+    border: 1px solid #b8922b !important;
+    font-weight: 600 !important;
+}
+
+/* X (remove tag) icon color override */
+div[data-baseweb="tag"] svg,
+span[data-baseweb="tag"] svg {
+    fill: #3C2F00 !important;
+}
+
+/* Hover state */
+div[data-baseweb="tag"]:hover,
+span[data-baseweb="tag"]:hover {
+    background: #E2C15F !important;       /* Lighter gold hover */
+    color: #2b2200 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -973,4 +979,5 @@ with tab5:
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No products match your filters.")
+
 
