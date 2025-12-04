@@ -6,7 +6,6 @@ import math
 import plotly.express as px
 import plotly.graph_objects as go
 from numpy.linalg import norm
-import os
 
 EXCEL_FILE = "Enchanto_Products.xlsx"
 PRODUCT_SHEET = "Products"
@@ -125,6 +124,7 @@ st.markdown("""
 # ======================================================================
 # HEADER
 # ======================================================================
+import os
 col_logo, col_title = st.columns([1, 6])
 
 with col_logo:
@@ -134,6 +134,7 @@ with col_logo:
         st.write("🧴")
 
 with col_title:
+    # Italic, smaller font to fit in one line
     st.markdown("""
     <div style='font-style: italic; font-size: 1.5rem; line-height: 1.6; padding-top: 25px; padding-bottom: 10px; font-weight: 600; color: #0f172a;'>
         Enchanto – AI-Powered Recommendation Dashboard
@@ -148,12 +149,18 @@ st.caption("Collaborative • Content-Based • Hybrid | CLV • Engagement • 
 def load_products():
     try:
         products = pd.read_excel(EXCEL_FILE, sheet_name=PRODUCT_SHEET)
+
+        # --- FIX: Robust extraction of bottle size: "50ml", "50 ml", "50ML", "50 ml bottle", etc. ---
         if "Bottle Size" in products.columns:
             products["BottleML"] = (
-                products["Bottle Size"].astype(str).str.extract(r"(\\d+)", expand=False).astype(float)
+                products["Bottle Size"]
+                .astype(str)
+                .str.extract(r"(\d+)", expand=False)
+                .astype(float)
             )
         else:
-            products["BottleML"] = 50.0
+            products["BottleML"] = 50.0  # sensible default
+
         return products
     except Exception as e:
         st.error(f"Error loading products: {e}")
@@ -176,6 +183,7 @@ def generate_meaningful_data(n_users=200):
     cats = products["Category"].dropna().unique().tolist()
     scents = products["Scent Notes"].dropna().unique().tolist()
     
+    # Define Personas
     personas = [
         {"name": "The Loyalist", "weight": 0.2, "income_range": (80000, 150000), "activity_mult": 2.0, "buy_prob": 0.4},
         {"name": "The Window Shopper", "weight": 0.3, "income_range": (20000, 50000), "activity_mult": 1.5, "buy_prob": 0.05},
@@ -193,6 +201,7 @@ def generate_meaningful_data(n_users=200):
     for i in range(1, n_users + 1):
         uid = f"U{str(i).zfill(3)}"
         
+        # Assign Persona
         persona = random.choices(personas, weights=[p["weight"] for p in personas], k=1)[0]
         
         age = random.randint(18, 60)
@@ -215,20 +224,26 @@ def generate_meaningful_data(n_users=200):
             "preferred_scent": pref_scent
         })
         
+        # Generate Activities based on Persona
+        # Adjusted for small catalog: range 3-12 interactions
         n_interactions = int(random.randint(3, 12) * persona["activity_mult"])
         
+        # Select products: Bias towards preferred category/scent
         candidates = products[
             (products["Category"] == pref_cat) | (products["Scent Notes"] == pref_scent)
         ][PRODUCT_ID_COL].tolist()
         
+        # Fill with randoms if not enough candidates
         if len(candidates) < n_interactions:
             candidates.extend(random.sample(prod_ids, min(len(prod_ids), n_interactions - len(candidates))))
             
         selected_pids = random.sample(candidates, min(len(candidates), n_interactions))
         
         for pid in selected_pids:
+            # Interaction Logic
             views = random.randint(1, 5)
             
+            # Purchase logic based on persona buy_prob and price
             price = price_map.get(pid, 1000)
             price_factor = 1.0
             if persona["name"] == "The Window Shopper" and price > 5000:
@@ -245,9 +260,10 @@ def generate_meaningful_data(n_users=200):
             if payment_page and random.random() < 0.9:
                 purchase_count = random.choice([1, 1, 2])
             
+            # Rating
             rating = np.nan
             if purchase_count > 0:
-                rating = random.choice([4, 5, 5, 3])
+                rating = random.choice([4, 5, 5, 3])  # Bias towards positive
             elif wishlist:
                 rating = random.choice([3, 4, 5])
                 
@@ -260,12 +276,13 @@ def generate_meaningful_data(n_users=200):
                 "payment_page": payment_page,
                 "purchase_count": purchase_count,
                 "rating": rating,
-                "price": price
+                "price": price  # Track price for accurate spend calc
             })
             
     users_df = pd.DataFrame(users)
     activity_df = pd.DataFrame(activities)
     
+    # Calculate Engagement Score
     def engagement(row):
         score = (
             0.1 * row["views"] +
@@ -278,18 +295,22 @@ def generate_meaningful_data(n_users=200):
         return score
 
     activity_df["engagement_score"] = activity_df.apply(engagement, axis=1)
-    activity_df["cf_rating"] = activity_df["engagement_score"].clip(1, 5)
+    activity_df["cf_rating"] = activity_df["engagement_score"].clip(1, 5)  # Simple scaling
     activity_df["is_positive"] = (activity_df["purchase_count"] > 0) | (activity_df["rating"] >= 4)
     
+    # --- ENRICH USER DATA ---
+    # Calculate aggregate metrics per user for the dashboard
     user_metrics = activity_df.groupby("user_id").agg({
         "views": "sum",
         "purchase_count": "sum",
         "add_to_cart": "sum",
-        "price": lambda x: (x * activity_df.loc[x.index, "purchase_count"]).sum()
+        "price": lambda x: (x * activity_df.loc[x.index, "purchase_count"]).sum()  # Real Spend
     }).rename(columns={"price": "total_spend"})
     
+    # Get Cart Items (Product Names)
     cart_items = activity_df[activity_df["add_to_cart"] > 0].groupby("user_id")["product_id"].apply(
-        lambda x: ", ".join(products[products[PRODUCT_ID_COL].isin(x)][PRODUCT_NAME_COL].tolist()[:3]) + ("..." if len(x) > 3 else "")
+        lambda x: ", ".join(products[products[PRODUCT_ID_COL].isin(x)][PRODUCT_NAME_COL].tolist()[:3]) +
+                  ("..." if len(x) > 3 else "")
     ).rename("cart_preview")
 
     users_df = users_df.merge(user_metrics, on="user_id", how="left").fillna(0)
@@ -304,28 +325,20 @@ def generate_meaningful_data(n_users=200):
 users_df, activity_df = generate_meaningful_data()
 
 # ======================================================================
-# RECOMMENDER ENGINE (User-User + Item-Item CF + Content + Hybrid)
+# RECOMMENDER ENGINE
 # ======================================================================
 @st.cache_resource
 def build_recommender(users_df, activity_df, products):
-    if activity_df.empty or products.empty:
-        return None, None, None, None
+    if activity_df.empty:
+        return None, None, None
 
-    # Ratings matrix: users x products
-    ratings = activity_df.pivot_table(
-        index="user_id",
-        columns="product_id",
-        values="cf_rating",
-        aggfunc="mean"
-    )
-
+    # Ratings matrix for CF
+    ratings = activity_df.pivot_table(index="user_id", columns="product_id", values="cf_rating")
     user_mean = ratings.mean(axis=1)
     item_mean = ratings.mean(axis=0)
 
-    # ---------- USER-USER PEARSON SIMILARITY ----------
-    def pearson_user_sim(u, v):
-        if u not in ratings.index or v not in ratings.index:
-            return 0.0
+    # ---------- User–User Pearson ----------
+    def pearson_sim_user(u, v):
         ru, rv = ratings.loc[u], ratings.loc[v]
         mask = (~ru.isna()) & (~rv.isna())
         if mask.sum() < 2:
@@ -333,127 +346,134 @@ def build_recommender(users_df, activity_df, products):
         ru_c = ru[mask] - user_mean[u]
         rv_c = rv[mask] - user_mean[v]
         num = (ru_c * rv_c).sum()
-        den = (ru_c.pow(2).sum()**0.5) * (rv_c.pow(2).sum()**0.5)
+        den = (ru_c.pow(2).sum() ** 0.5) * (rv_c.pow(2).sum() ** 0.5)
         return num / den if den else 0.0
 
-    # ---------- ITEM-ITEM PEARSON SIMILARITY ----------
-    item_sim_cache = {}
+    def predict_user_user(user_id, item_id, k=10):
+        # Return NaN if user or item not in matrix
+        if user_id not in ratings.index or item_id not in ratings.columns:
+            return np.nan
 
-    def pearson_item_sim(i, j):
-        if i == j:
-            return 1.0
-        key = tuple(sorted([i, j]))
-        if key in item_sim_cache:
-            return item_sim_cache[key]
-        if i not in ratings.columns or j not in ratings.columns:
-            item_sim_cache[key] = 0.0
-            return 0.0
-        ri, rj = ratings[i], ratings[j]  # series over users
-        mask = (~ri.isna()) & (~rj.isna())
-        if mask.sum() < 2:
-            item_sim_cache[key] = 0.0
-            return 0.0
-        ri_c = ri[mask] - item_mean[i]
-        rj_c = rj[mask] - item_mean[j]
-        num = (ri_c * rj_c).sum()
-        den = (ri_c.pow(2).sum()**0.5) * (rj_c.pow(2).sum()**0.5)
-        sim = num / den if den else 0.0
-        item_sim_cache[key] = sim
-        return sim
+        # If user already rated this item, just return existing rating
+        existing = ratings.loc[user_id, item_id]
+        if not pd.isna(existing):
+            return existing
 
-    # ---------- USER-USER CF PREDICTIONS ----------
-    def user_user_predictions(user_id):
-        if user_id not in ratings.index:
-            return {}
-        ru = ratings.loc[user_id]
         sims = {}
         for other in ratings.index:
             if other == user_id:
                 continue
-            s = pearson_user_sim(user_id, other)
-            if s > 0:
-                sims[other] = s
+            rv = ratings.loc[other, item_id]
+            if pd.isna(rv):
+                continue
+            s = pearson_sim_user(user_id, other)
+            if s <= 0:
+                continue
+            sims[other] = s
+
         if not sims:
-            return {}
-        neighbors = sorted(sims.items(), key=lambda x: x[1], reverse=True)[:20]
-        preds = {}
-        for item in ratings.columns:
-            if not math.isnan(ru.get(item, np.nan)):
-                continue
-            num, den = 0.0, 0.0
-            for v, s in neighbors:
-                rv = ratings.loc[v, item]
-                if math.isnan(rv):
-                    continue
-                num += s * (rv - user_mean[v])
-                den += abs(s)
-            if den != 0:
-                preds[item] = float(user_mean[user_id] + num / den)
-        return preds
+            return np.nan
 
-    # ---------- ITEM-ITEM CF PREDICTIONS ----------
-    def item_item_predictions(user_id):
-        if user_id not in ratings.index:
-            return {}
-        ru = ratings.loc[user_id]
-        rated_items = ru[~ru.isna()].index.tolist()
-        if not rated_items:
-            return {}
-        preds = {}
-        for item in ratings.columns:
-            if not math.isnan(ru.get(item, np.nan)):
+        neighbors = sorted(sims.items(), key=lambda x: x[1], reverse=True)[:k]
+        num, den = 0.0, 0.0
+        for v, sim_val in neighbors:
+            rv = ratings.loc[v, item_id]
+            if pd.isna(rv):
                 continue
-            num, den = 0.0, 0.0
-            for j in rated_items:
-                sim = pearson_item_sim(item, j)
-                if sim <= 0:
-                    continue
-                r_uj = ru[j]
-                num += sim * (r_uj - item_mean[j])
-                den += abs(sim)
-            if den != 0:
-                preds[item] = float(item_mean[item] + num / den)
-        return preds
+            num += sim_val * (rv - user_mean[v])
+            den += abs(sim_val)
 
-    # ---------- FINAL CF PREDICT (User-User + Item-Item + THRESHOLD) ----------
-    def cf_predict(user_id, top_n=None):
+        if den == 0:
+            return np.nan
+        return float(user_mean[user_id] + num / den)
+
+    # ---------- Item–Item Pearson ----------
+    def pearson_sim_item(i, j):
+        ri, rj = ratings[i], ratings[j]
+        mask = (~ri.isna()) & (~rj.isna())
+        if mask.sum() < 2:
+            return 0.0
+        ri_c = ri[mask] - item_mean[i]
+        rj_c = rj[mask] - item_mean[j]
+        num = (ri_c * rj_c).sum()
+        den = (ri_c.pow(2).sum() ** 0.5) * (rj_c.pow(2).sum() ** 0.5)
+        return num / den if den else 0.0
+
+    def predict_item_item(user_id, item_id, k=10):
+        if user_id not in ratings.index or item_id not in ratings.columns:
+            return np.nan
+
+        existing = ratings.loc[user_id, item_id]
+        if not pd.isna(existing):
+            return existing
+
+        user_row = ratings.loc[user_id]
+        sims = {}
+        for j in ratings.columns:
+            r_uj = user_row[j]
+            if pd.isna(r_uj):
+                continue
+            s = pearson_sim_item(item_id, j)
+            if s <= 0:
+                continue
+            sims[j] = s
+
+        if not sims:
+            return np.nan
+
+        neighbors = sorted(sims.items(), key=lambda x: x[1], reverse=True)[:k]
+        num, den = 0.0, 0.0
+        for j, sim_val in neighbors:
+            r_uj = ratings.loc[user_id, j]
+            if pd.isna(r_uj):
+                continue
+            num += sim_val * (r_uj - item_mean[j])
+            den += abs(sim_val)
+
+        if den == 0:
+            return np.nan
+        return float(item_mean[item_id] + num / den)
+
+    # ---------- Final CF recommender ----------
+    def cf_predict(user_id, top_n=5):
         if user_id not in ratings.index:
             return []
-        uu = user_user_predictions(user_id)
-        ii = item_item_predictions(user_id)
-        if not uu and not ii:
-            return []
 
-        all_items = set(uu.keys()) | set(ii.keys())
-        recs = []
-        u_avg = user_mean.get(user_id, np.nan)
+        preds = {}
+        user_avg = user_mean[user_id]
 
-        for pid in all_items:
-            s_u = uu.get(pid, None)
-            s_i = ii.get(pid, None)
-            if s_u is not None and s_i is not None:
-                score = (s_u + s_i) / 2.0
-            elif s_u is not None:
-                score = s_u
-            else:
-                score = s_i
-            if score is None or math.isnan(score):
+        for item_id in ratings.columns:
+            # Skip items already rated by the user
+            if not pd.isna(ratings.loc[user_id, item_id]):
                 continue
 
-            p_avg = item_mean.get(pid, np.nan)
-            cond1 = (not np.isnan(u_avg)) and (score > u_avg)
-            cond2 = (not np.isnan(p_avg)) and (score > p_avg)
+            r_uu = predict_user_user(user_id, item_id)
+            r_ii = predict_item_item(user_id, item_id)
 
-            # CF decision: recommend only if rating above both averages
-            if cond1 and cond2:
-                recs.append((pid, float(score)))
+            candidates = []
+            if not pd.isna(r_uu):
+                candidates.append(r_uu)
+            if not pd.isna(r_ii):
+                candidates.append(r_ii)
 
-        recs.sort(key=lambda x: x[1], reverse=True)
-        if top_n is not None:
-            recs = recs[:top_n]
-        return recs
+            if not candidates:
+                continue
 
-    # ---------- CONTENT-BASED ----------
+            r_hat = float(sum(candidates) / len(candidates))
+            item_avg = item_mean[item_id]
+
+            # Threshold condition:
+            # Recommend only if predicted rating beats both:
+            # user's average rating AND product's average rating
+            cond_user = (pd.isna(user_avg) or r_hat > user_avg)
+            cond_item = (pd.isna(item_avg) or r_hat > item_avg)
+
+            if cond_user and cond_item:
+                preds[item_id] = r_hat
+
+        return sorted(preds.items(), key=lambda x: x[1], reverse=True)[:top_n]
+
+    # ---------- Content Based ----------
     feat_base = products.copy()
     feat_base["Price"] = pd.to_numeric(feat_base["Price"], errors="coerce").fillna(0)
     feat_base["Category"] = feat_base["Category"].astype(str)
@@ -476,7 +496,7 @@ def build_recommender(users_df, activity_df, products):
         prof = (vectors * weights).sum(axis=0) / (weights.sum() + 1e-9)
         return prof
 
-    def content_predict(user_id, top_n=10):
+    def content_predict(user_id, top_n=5):
         prof = build_user_profile(user_id)
         if prof is None:
             return []
@@ -485,38 +505,23 @@ def build_recommender(users_df, activity_df, products):
         s = pd.Series(sims, index=feat.index)
         seen = activity_df[activity_df["user_id"] == user_id]["product_id"].unique().tolist()
         s = s.drop(index=seen, errors="ignore")
-        s = s.sort_values(ascending=False)
-        if top_n is not None:
-            s = s.head(top_n)
-        return list(s.items())
+        return list(s.sort_values(ascending=False).head(top_n).items())
 
-    # ---------- HYBRID (CF + Content) ----------
-    def hybrid_predict(user_id, top_n=10):
-        cf_recs = dict(cf_predict(user_id, top_n=None))  # already thresholded
-        cb_recs = dict(content_predict(user_id, top_n=50))
-        all_pids = set(cf_recs.keys()) | set(cb_recs.keys())
+    # ---------- Hybrid ----------
+    def hybrid_predict(user_id, top_n=5):
+        cf = dict(cf_predict(user_id, 20))
+        cb = dict(content_predict(user_id, 20))
+        all_keys = set(cf.keys()) | set(cb.keys())
         scores = {}
-        for pid in all_pids:
-            s_cf = cf_recs.get(pid, 0.0)
-            s_cb = cb_recs.get(pid, 0.0)
-            scores[pid] = 0.6 * s_cf + 0.4 * s_cb
-        recs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        if top_n is not None:
-            recs = recs[:top_n]
-        return recs
+        for k in all_keys:
+            s1 = cf.get(k, 0)
+            s2 = cb.get(k, 0)
+            scores[k] = 0.6 * s1 + 0.4 * s2
+        return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
-    # ---------- TRENDING / BEST SELLERS (Fallback) ----------
-    def trending_products(top_n=10):
-        if activity_df.empty:
-            return []
-        agg = activity_df.groupby("product_id")["purchase_count"].sum()
-        agg = agg.sort_values(ascending=False)
-        pids = agg.head(top_n).index.tolist()
-        return [(pid, float(agg.loc[pid])) for pid in pids]
+    return cf_predict, content_predict, hybrid_predict
 
-    return cf_predict, content_predict, hybrid_predict, trending_products
-
-cf_predict, content_predict, hybrid_predict, trending_products = build_recommender(users_df, activity_df, products)
+cf_predict, content_predict, hybrid_predict = build_recommender(users_df, activity_df, products)
 
 # ======================================================================
 # SIDEBAR FILTERS
@@ -524,7 +529,13 @@ cf_predict, content_predict, hybrid_predict, trending_products = build_recommend
 st.sidebar.subheader("🎯 Segment Filters")
 
 age_range = st.sidebar.slider("Age Range", int(users_df.age.min()), int(users_df.age.max()), (18, 60))
-income_range = st.sidebar.slider("Income Range (₹)", int(users_df.income.min()), int(users_df.income.max()), (15000, 300000), step=5000)
+income_range = st.sidebar.slider(
+    "Income Range (₹)",
+    int(users_df.income.min()),
+    int(users_df.income.max()),
+    (15000, 300000),
+    step=5000
+)
 
 def filter_col(col):
     vals = sorted(users_df[col].unique())
@@ -587,6 +598,8 @@ def show_product_details(pid):
         st.markdown(f"**Price:** ₹{p['Price']}")
         st.markdown(f"**Scent:** {p['Scent Notes']}")
         st.markdown(f"**Rating:** {'⭐'*int(p['Rating'])} ({p['Rating']})")
+        
+        # Description from "Short Marketing Description"
         desc = p.get("Short Marketing Description", "No description available.")
         if pd.isna(desc):
             desc = "No description available."
@@ -615,25 +628,48 @@ with tab1:
         with col1:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### User Distribution by Persona")
-            fig_pie = px.pie(seg_users, names="persona", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor="rgba(0,0,0,0)")
+            fig_pie = px.pie(seg_users, names="persona", hole=0.4,
+                             color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_pie.update_layout(
+                margin=dict(t=0, b=0, l=0, r=0),
+                paper_bgcolor="rgba(0,0,0,0)"
+            )
             st.plotly_chart(fig_pie, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         with col2:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### Income vs Age (by Persona)")
-            fig_scat = px.scatter(seg_users, x="age", y="income", color="persona", size="income", 
-                                  color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_scat.update_layout(margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig_scat = px.scatter(
+                seg_users,
+                x="age",
+                y="income",
+                color="persona",
+                size="income",
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            fig_scat.update_layout(
+                margin=dict(t=0, b=0, l=0, r=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)"
+            )
             st.plotly_chart(fig_scat, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.markdown("#### Regional Preferences")
         region_cat = seg_users.groupby(["region", "preferred_category"]).size().reset_index(name="count")
-        fig_bar = px.bar(region_cat, x="region", y="count", color="preferred_category", barmode="group",
-                         color_discrete_sequence=px.colors.qualitative.Pastel2)
-        fig_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        fig_bar = px.bar(
+            region_cat,
+            x="region",
+            y="count",
+            color="preferred_category",
+            barmode="group",
+            color_discrete_sequence=px.colors.qualitative.Pastel2
+        )
+        fig_bar.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)"
+        )
         st.plotly_chart(fig_bar, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -649,8 +685,7 @@ with tab1:
                 "income": "₹{:,.0f}", 
                 "total_spend": "₹{:,.0f}", 
                 "avg_order_value": "₹{:,.0f}"
-            }), 
-            use_container_width=True
+            })
         )
         
         st.markdown("---")
@@ -663,18 +698,38 @@ with tab1:
             st.markdown("#### Activity by Persona")
             act_persona = seg_users.groupby("persona")[["views", "add_to_cart", "purchase_count"]].mean().reset_index()
             act_persona = act_persona.melt(id_vars="persona", var_name="Activity", value_name="Avg Count")
-            fig_act = px.bar(act_persona, x="persona", y="Avg Count", color="Activity", barmode="group",
-                             color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_act.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                                  showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            
+            fig_act = px.bar(
+                act_persona,
+                x="persona",
+                y="Avg Count",
+                color="Activity",
+                barmode="group",
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            fig_act.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
             st.plotly_chart(fig_act, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with g2:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### Spend Distribution")
-            fig_hist = px.histogram(seg_users, x="total_spend", nbins=20, color_discrete_sequence=["#d4af37"])
-            fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Total Spend (₹)")
+            fig_hist = px.histogram(
+                seg_users,
+                x="total_spend",
+                nbins=20,
+                color_discrete_sequence=["#d4af37"]
+            )
+            fig_hist.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Total Spend (₹)"
+            )
             st.plotly_chart(fig_hist, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
@@ -683,8 +738,16 @@ with tab1:
             st.markdown("#### Purchase Frequency")
             freq_counts = seg_users["purchase_count"].value_counts().reset_index()
             freq_counts.columns = ["Purchases", "Count"]
-            fig_freq = px.bar(freq_counts, x="Purchases", y="Count", color_discrete_sequence=["#0ea5e9"])
-            fig_freq.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig_freq = px.bar(
+                freq_counts,
+                x="Purchases",
+                y="Count",
+                color_discrete_sequence=["#0ea5e9"]
+            )
+            fig_freq.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)"
+            )
             st.plotly_chart(fig_freq, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
@@ -696,8 +759,11 @@ with tab1:
             "price": "sum"
         }).reset_index()
         
-        prod_perf = prod_perf.merge(products[[PRODUCT_ID_COL, PRODUCT_NAME_COL, "Category"]],
-                                    left_on="product_id", right_on=PRODUCT_ID_COL)
+        prod_perf = prod_perf.merge(
+            products[[PRODUCT_ID_COL, PRODUCT_NAME_COL, "Category"]],
+            left_on="product_id",
+            right_on=PRODUCT_ID_COL
+        )
         prod_perf = prod_perf.rename(columns={"purchase_count": "Units Sold", "price": "Revenue"})
         
         p1, p2 = st.columns(2)
@@ -706,18 +772,32 @@ with tab1:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### Top 10 Best Sellers")
             top_sold = prod_perf.sort_values("Units Sold", ascending=False).head(10)
-            fig_top = px.bar(top_sold, x="Units Sold", y=PRODUCT_NAME_COL, orientation='h', 
-                             color="Units Sold", color_continuous_scale="Reds")
-            fig_top.update_layout(yaxis={'categoryorder':'total ascending'}, 
-                                  paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig_top = px.bar(
+                top_sold,
+                x="Units Sold",
+                y=PRODUCT_NAME_COL,
+                orientation='h',
+                color="Units Sold",
+                color_continuous_scale="Reds"
+            )
+            fig_top.update_layout(
+                yaxis={'categoryorder': 'total ascending'},
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)"
+            )
             st.plotly_chart(fig_top, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
         with p2:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.markdown("#### Revenue Landscape (Treemap)")
-            fig_tree = px.treemap(prod_perf, path=[px.Constant("All Products"), "Category", PRODUCT_NAME_COL], values='Revenue',
-                                  color='Revenue', color_continuous_scale='RdBu')
+            fig_tree = px.treemap(
+                prod_perf,
+                path=[px.Constant("All Products"), "Category", PRODUCT_NAME_COL],
+                values='Revenue',
+                color='Revenue',
+                color_continuous_scale='RdBu'
+            )
             fig_tree.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_tree, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -725,7 +805,13 @@ with tab1:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.markdown("#### Category Sales Share")
         cat_share = prod_perf.groupby("Category")["Revenue"].sum().reset_index()
-        fig_donut = px.pie(cat_share, names="Category", values="Revenue", hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_donut = px.pie(
+            cat_share,
+            names="Category",
+            values="Revenue",
+            hole=0.5,
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
         fig_donut.update_layout(paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig_donut, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -735,11 +821,15 @@ with tab1:
 # ======================================================================
 with tab2:
     if selected_user:
-        st.markdown(f"### Personalized Recommendations")
+        st.markdown("### Personalized Recommendations")
         
         u_acts = activity_df[activity_df["user_id"] == selected_user]
-        total_spend = (u_acts["purchase_count"] * u_acts["product_id"].map(
-            lambda x: products.set_index(PRODUCT_ID_COL).loc[x, "Price"])).sum()
+        total_spend = (
+            u_acts["purchase_count"] *
+            u_acts["product_id"].map(
+                lambda x: products.set_index(PRODUCT_ID_COL).loc[x, "Price"]
+            )
+        ).sum()
         
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Age", u["age"])
@@ -750,16 +840,16 @@ with tab2:
         purchase_count = int(u_acts["purchase_count"].sum())
         if purchase_count == 0:
             best_model = "Content-Based"
-            reason = "User has no purchase history. Content-based filtering + trending perfumes are used."
-            why_not = "Collaborative Filtering requires purchase history to find similar users."
+            reason = "User has no purchase history. Content-based filtering recommends items similar to those viewed/liked."
+            why_not = "Collaborative Filtering needs purchase or rating history to find similar users/products."
         elif purchase_count < 5:
             best_model = "Hybrid"
-            reason = "User has limited history. Hybrid balances discovery (content) with peer patterns (CF)."
-            why_not = "Pure CF might be sparse; pure Content might limit diversity."
+            reason = "User has limited history. Hybrid balances discovery (content) with community trends (CF)."
+            why_not = "Pure CF might be too sparse; pure Content may reduce diversity."
         else:
             best_model = "Collaborative Filtering"
-            reason = "User has rich history; CF (User-User + Item-Item) can reliably estimate strong preferences."
-            why_not = "Pure content-based may over-focus on similar perfumes and ignore peer wisdom."
+            reason = "User has rich history. CF (user–user + item–item) can leverage similar behaviour for precise recommendations."
+            why_not = "Pure Content could be repetitive; CF uses broader community patterns."
             
         st.markdown(f"**Best Model for this user:** `{best_model}`")
         with st.expander("ℹ️ Why this model?"):
@@ -768,53 +858,18 @@ with tab2:
         
         st.markdown("---")
         
-        # ---- GET RECOMMENDATIONS BASED ON BEST MODEL ----
-        recs = []
-        model_used = best_model
-
-        if best_model == "Content-Based":
-            recs = content_predict(selected_user, top_n=20) if content_predict else []
-            if not recs:  # Fallback to trending if CB empty
-                recs = trending_products(top_n=20) if trending_products else []
-                model_used = "Trending (Fallback)"
-        elif best_model == "Hybrid":
-            recs = hybrid_predict(selected_user, top_n=20) if hybrid_predict else []
-            if not recs:
-                # Fallback to content, then trending
-                recs = content_predict(selected_user, top_n=20) if content_predict else []
-                if not recs:
-                    recs = trending_products(top_n=20) if trending_products else []
-                    model_used = "Trending (Fallback)"
-                else:
-                    model_used = "Content-Based (Fallback)"
-        else:  # Collaborative
-            recs = cf_predict(selected_user, top_n=None) if cf_predict else []
-            if not recs:
-                # Fallback pipeline: Hybrid -> Content -> Trending
-                recs = hybrid_predict(selected_user, top_n=20) if hybrid_predict else []
-                if recs:
-                    model_used = "Hybrid (Fallback from CF)"
-                else:
-                    recs = content_predict(selected_user, top_n=20) if content_predict else []
-                    if recs:
-                        model_used = "Content-Based (Fallback from CF)"
-                    else:
-                        recs = trending_products(top_n=20) if trending_products else []
-                        model_used = "Trending (Fallback from CF)"
-
-        st.caption(f"Using: **{model_used}** recommendations")
-
-        # 1. Top Recommendation Cards (show top 4)
         st.markdown("### 🎁 You may also like these....")
+        # Using hybrid by default so it always blends CF+Content
+        recs = hybrid_predict(selected_user, top_n=4)
         if recs:
-            top_recs = recs[:4]
             cols = st.columns(4)
-            for i, (pid, score) in enumerate(top_recs):
-                if pid not in products[PRODUCT_ID_COL].values:
-                    continue
+            for i, (pid, score) in enumerate(recs):
                 p = products[products[PRODUCT_ID_COL] == pid].iloc[0]
                 with cols[i]:
-                    st.markdown("<div class='glass-card' style='height: 100%; display: flex; flex-direction: column; justify-content: space-between;'>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div class='glass-card' style='height: 100%; display: flex; flex-direction: column; justify-content: space-between;'>",
+                        unsafe_allow_html=True
+                    )
                     
                     content_html = ""
                     if pd.notna(p.get(IMAGE_URL_COL)):
@@ -831,16 +886,13 @@ with tab2:
                     
                     st.markdown(content_html, unsafe_allow_html=True)
                     
-                    if st.button("View details", key=f"btn_rec_{pid}", use_container_width=True):
+                    if st.button("View details", key=f"btn_rec_{pid}"):
                         show_product_details(pid)
                     
                     st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            st.info("No recommendations could be generated for this user.")
-
+        
         st.markdown("---")
         
-        # 2. Because you bought X...
         st.markdown("### 🛒 Because you bought...")
         
         purchased = u_acts[u_acts["purchase_count"] > 0]
@@ -858,7 +910,10 @@ with tab2:
             with col_main:
                 st.markdown("<div class='glass-card' style='text-align: center;'>", unsafe_allow_html=True)
                 if pd.notna(last_p.get(IMAGE_URL_COL)):
-                    st.markdown(f"<img src='{last_p[IMAGE_URL_COL]}' style='width: 100%; border-radius: 10px; margin-bottom: 10px;'>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<img src='{last_p[IMAGE_URL_COL]}' style='width: 100%; border-radius: 10px; margin-bottom: 10px;'>",
+                        unsafe_allow_html=True
+                    )
                 st.markdown(f"**{last_p[PRODUCT_NAME_COL]}**")
                 st.caption("Your Last Purchase")
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -870,16 +925,28 @@ with tab2:
                         with r_cols[i]:
                             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
                             if pd.notna(rp.get(IMAGE_URL_COL)):
-                                st.markdown(f"<img src='{rp[IMAGE_URL_COL]}' class='rec-img' style='height: 120px;'>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='rec-title' style='font-size: 0.9rem;'>{rp[PRODUCT_NAME_COL]}</div>", unsafe_allow_html=True)
+                                st.markdown(
+                                    f"<img src='{rp[IMAGE_URL_COL]}' class='rec-img' style='height: 120px;'>",
+                                    unsafe_allow_html=True
+                                )
+                            st.markdown(
+                                f"<div class='rec-title' style='font-size: 0.9rem;'>{rp[PRODUCT_NAME_COL]}</div>",
+                                unsafe_allow_html=True
+                            )
                             
                             rating = float(rp.get("Rating", 4.0))
                             stars = "⭐" * int(round(rating))
-                            st.markdown(f"<div style='color: #f59e0b; font-size: 0.8rem; margin-bottom: 4px;'>{stars} ({rating})</div>", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<div style='color: #f59e0b; font-size: 0.8rem; margin-bottom: 4px;'>{stars} ({rating})</div>",
+                                unsafe_allow_html=True
+                            )
                             
-                            st.markdown(f"<div class='rec-price' style='font-size: 1rem;'>₹{rp['Price']}</div>", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<div class='rec-price' style='font-size: 1rem;'>₹{rp['Price']}</div>",
+                                unsafe_allow_html=True
+                            )
                             
-                            if st.button("View details", key=f"btn_rel_{rp[PRODUCT_ID_COL]}", use_container_width=True):
+                            if st.button("View details", key=f"btn_rel_{rp[PRODUCT_ID_COL]}"):
                                 show_product_details(rp[PRODUCT_ID_COL])
                             st.markdown("</div>", unsafe_allow_html=True)
         else:
@@ -930,9 +997,14 @@ with tab3:
     st.markdown("#### 📉 Engagement Funnel (Segment)")
     fig_funnel = px.funnel(
         dict(number=[agg_views, agg_carts, agg_purchases], stage=["Views", "Add to Cart", "Purchases"]),
-        x='number', y='stage', color_discrete_sequence=["#d4af37"]
+        x='number',
+        y='stage',
+        color_discrete_sequence=["#d4af37"]
     )
-    fig_funnel.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig_funnel.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
     
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.plotly_chart(fig_funnel, use_container_width=True)
@@ -945,7 +1017,11 @@ with tab4:
     if selected_user:
         st.markdown(f"### 💼 CLV Analysis for {selected_user}")
         
-        user_rev = total_spend
+        u_acts = activity_df[activity_df["user_id"] == selected_user]
+        user_rev = (
+            u_acts["purchase_count"] *
+            u_acts["product_id"].map(lambda x: products.set_index(PRODUCT_ID_COL).loc[x, "Price"])
+        ).sum()
         avg_order_val = user_rev / int(u_acts["purchase_count"].sum()) if int(u_acts["purchase_count"].sum()) > 0 else 0
         
         persona_mult = {
@@ -969,7 +1045,7 @@ with tab4:
             st.markdown("#### 📊 CLV Calculation Logic")
             
             st.markdown(f"""
-            **Formula**:
+            **Formula**:  
             `CLV = (Current Revenue × Multiplier) + Base Potential`
             
             **User Values**:
@@ -977,7 +1053,7 @@ with tab4:
             - Multiplier: {mult}x ({u['persona']})
             - Base Potential: ₹5,000
             
-            **Projection**:
+            **Projection**:  
             ₹{user_rev:,.0f} × {mult} + ₹5,000 = **₹{projected_clv:,.0f}**
             """)
             
@@ -991,7 +1067,10 @@ with tab4:
             st.markdown("---")
             st.markdown(f"**Vs. {u['persona']} Average**:")
             st.markdown(f"Avg CLV: ₹{seg_avg_clv:,.0f}")
-            st.markdown(f"Difference: <span style='color:{color}; font-weight:bold;'>{'▲' if diff>=0 else '▼'} ₹{abs(diff):,.0f}</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"Difference: <span style='color:{color}; font-weight:bold;'>{'▲' if diff>=0 else '▼'} ₹{abs(diff):,.0f}</span>",
+                unsafe_allow_html=True
+            )
             
             st.markdown("</div>", unsafe_allow_html=True)
             
@@ -1014,9 +1093,9 @@ with tab4:
             st.markdown("#### 🧠 User & Segment Profile Insights")
             st.markdown(f"""
             **Why this segment?**
-            - **Spending Pattern**: This user fits the **{u['persona']}** profile due to their purchase frequency and average order value.
-            - **Preferences**: Their activity shows a strong affinity for **{u['preferred_category']}** products, aligning with the segment's dominant preference.
-            - **Engagement**: With **{int(u_acts['views'].sum())} views**, they are highly engaged, suggesting high potential for cross-selling **{u['preferred_scent']}** notes.
+            - **Spending Pattern**: This user fits the **{u['persona']}** profile based on purchase frequency and average order value.
+            - **Preferences**: Strong affinity for **{u['preferred_category']}** products, aligned with this persona's top category.
+            - **Engagement**: With **{int(u_acts['views'].sum())} views**, the user is highly engaged, ideal for cross-selling **{u['preferred_scent']}** notes.
             """)
             st.markdown("</div>", unsafe_allow_html=True)
             
@@ -1034,22 +1113,25 @@ with tab4:
         }).reset_index()
         
         strategies = {
-            "The Loyalist": "🏆 **Retention Focus**: These users are your backbone. Offer a loyalty program tier upgrade or early access to new launches.",
-            "The Window Shopper": "🏷️ **Conversion Focus**: High interest, low purchase. Retarget with 'Price Drop' alerts or limited-time 10% off coupons.",
-            "The Big Spender": "💎 **VIP Focus**: High value. Offer concierge services, exclusive bundles, or 'Private Reserve' collections.",
-            "The Newbie": "🌱 **Onboarding Focus**: New to the brand. Send educational content (e.g., 'How to wear perfume') and a welcome discount.",
-            "The Deal Hunter": "⚡ **Volume Focus**: Price sensitive. Promote 'Buy 2 Get 1 Free' offers or clearance sales to clear inventory."
+            "The Loyalist": "🏆 **Retention Focus**: Offer loyalty tier upgrades, exclusive previews and 'thank you' campaigns.",
+            "The Window Shopper": "🏷️ **Conversion Focus**: Retarget with price-drop alerts, time-bound coupons and social proof.",
+            "The Big Spender": "💎 **VIP Focus**: Provide concierge support, limited editions and premium bundles.",
+            "The Newbie": "🌱 **Onboarding Focus**: Send educational content, discovery kits and welcome discounts.",
+            "The Deal Hunter": "⚡ **Volume Focus**: Promote bundles, BOGO offers and clearance sales."
         }
         
         cols = st.columns(len(seg_stats))
         for idx, row in seg_stats.iterrows():
             p_name = row['persona']
-            with cols[idx % 4]:
-                st.markdown(f"<div class='glass-card' style='height: 100%;'>", unsafe_allow_html=True)
+            with cols[idx % len(cols)]:
+                st.markdown("<div class='glass-card' style='height: 100%;'>", unsafe_allow_html=True)
                 st.markdown(f"#### {p_name}")
                 st.caption(f"Avg Income: ₹{row['income']:,.0f}")
                 st.caption(f"Top Cat: {row['preferred_category']}")
-                st.markdown(f"<div style='margin-top: 10px; font-size: 0.9rem;'>{strategies.get(p_name, 'General engagement strategy.')}</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='margin-top: 10px; font-size: 0.9rem;'>{strategies.get(p_name, 'General engagement strategy.')}</div>",
+                    unsafe_allow_html=True
+                )
                 st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("No segments visible with current filters.")
@@ -1071,7 +1153,7 @@ with tab5:
     for i, coll in enumerate(collections):
         if cols[i].button(coll, key=f"coll_btn_{i}", use_container_width=True):
             st.session_state.selected_collection = coll
-            
+    
     st.markdown("---")
     
     col_filters, col_grid = st.columns([1, 3])
@@ -1086,8 +1168,9 @@ with tab5:
         sel_price = st.slider("Price Range", min_p, max_p, (min_p, max_p), key="port_price")
         
         sel_rating = st.slider("Minimum Rating", 0.0, 5.0, 3.0, step=0.5, key="port_rating")
-        
-        all_sizes = sorted(products["BottleML"].unique().tolist())
+
+        # ---- FIX: Remove NaN from BottleML before using in multiselect ----
+        all_sizes = sorted(products["BottleML"].dropna().unique().tolist())
         sel_sizes = st.multiselect("Size (mL)", all_sizes, default=all_sizes, key="port_size")
         
     with col_grid:
@@ -1108,16 +1191,28 @@ with tab5:
             rows = [filtered_prods.iloc[i:i+n_cols] for i in range(0, len(filtered_prods), n_cols)]
             
             for row in rows:
-                cols_row = st.columns(n_cols)
+                cols = st.columns(n_cols)
                 for i, (_, p) in enumerate(row.iterrows()):
-                    with cols_row[i]:
-                        st.markdown("<div class='glass-card' style='height: 100%; display: flex; flex-direction: column; justify-content: space-between;'>", unsafe_allow_html=True)
+                    with cols[i]:
+                        st.markdown(
+                            "<div class='glass-card' style='height: 100%; display: flex; flex-direction: column; justify-content: space-between;'>",
+                            unsafe_allow_html=True
+                        )
                         
                         if pd.notna(p.get(IMAGE_URL_COL)):
-                            st.markdown(f"<img src='{p[IMAGE_URL_COL]}' class='rec-img' style='height: 150px;'>", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<img src='{p[IMAGE_URL_COL]}' class='rec-img' style='height: 150px;'>",
+                                unsafe_allow_html=True
+                            )
                             
-                        st.markdown(f"<div class='rec-title' style='font-size: 0.9rem;'>{p[PRODUCT_NAME_COL]}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='font-weight:bold; color:#0f766e;'>₹{p['Price']}</div>", unsafe_allow_html=True)
+                        st.markdown(
+                            f"<div class='rec-title' style='font-size: 0.9rem;'>{p[PRODUCT_NAME_COL]}</div>",
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(
+                            f"<div style='font-weight:bold; color:#0f766e;'>₹{p['Price']}</div>",
+                            unsafe_allow_html=True
+                        )
                         st.caption(f"{p['Category']} | {p['BottleML']}ml")
                         st.markdown(f"⭐ {p['Rating']}")
                         
