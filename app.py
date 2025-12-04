@@ -634,7 +634,7 @@ with tab1:
                 margin=dict(t=0, b=0, l=0, r=0),
                 paper_bgcolor="rgba(0,0,0,0)"
             )
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
         with col2:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
@@ -652,7 +652,7 @@ with tab1:
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)"
             )
-            st.plotly_chart(fig_scat, use_container_width=True)
+            st.plotly_chart(fig_scat, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
@@ -670,7 +670,7 @@ with tab1:
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)"
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("### 📋 Detailed User Data")
@@ -713,7 +713,7 @@ with tab1:
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-            st.plotly_chart(fig_act, use_container_width=True)
+            st.plotly_chart(fig_act, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with g2:
@@ -730,7 +730,7 @@ with tab1:
                 plot_bgcolor="rgba(0,0,0,0)",
                 xaxis_title="Total Spend (₹)"
             )
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with g3:
@@ -748,7 +748,7 @@ with tab1:
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)"
             )
-            st.plotly_chart(fig_freq, use_container_width=True)
+            st.plotly_chart(fig_freq, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         st.markdown("---")
@@ -785,7 +785,7 @@ with tab1:
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)"
             )
-            st.plotly_chart(fig_top, use_container_width=True)
+            st.plotly_chart(fig_top, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         with p2:
@@ -799,7 +799,7 @@ with tab1:
                 color_continuous_scale='RdBu'
             )
             fig_tree.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig_tree, use_container_width=True)
+            st.plotly_chart(fig_tree, width="stretch")
             st.markdown("</div>", unsafe_allow_html=True)
             
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
@@ -813,7 +813,7 @@ with tab1:
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
         fig_donut.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_donut, use_container_width=True)
+        st.plotly_chart(fig_donut, width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================================
@@ -1007,7 +1007,7 @@ with tab3:
     )
     
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.plotly_chart(fig_funnel, use_container_width=True)
+    st.plotly_chart(fig_funnel, width="stretch")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================================
@@ -1099,6 +1099,63 @@ with tab4:
             """)
             st.markdown("</div>", unsafe_allow_html=True)
             
+            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+            
+            # --- Impact Analysis (Before vs After) ---
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+            st.markdown("#### 📉 Impact Analysis (Post-Recommendations)")
+            st.markdown("Simulated impact of applying the recommended strategies:")
+            
+            # Calculate Current Metrics
+            u_views = u_acts["views"].sum()
+            u_purchases = u_acts["purchase_count"].sum()
+            curr_conv = (u_purchases / u_views * 100) if u_views > 0 else 0
+            curr_eng = u_acts["engagement_score"].mean() if "engagement_score" in u_acts.columns else 0
+            
+            # Simulate Future Metrics (Random Lift)
+            # Conversion: +15% to +30%
+            # Engagement: +10% to +25%
+            # CLV: +10% to +20%
+            
+            lift_conv = random.uniform(1.15, 1.30)
+            lift_eng = random.uniform(1.10, 1.25)
+            lift_clv = random.uniform(1.10, 1.20)
+            
+            fut_conv = min(curr_conv * lift_conv, 100.0)
+            fut_eng = min(curr_eng * lift_eng, 10.0) # Cap at 10
+            fut_clv = projected_clv * lift_clv
+            
+            i1, i2, i3 = st.columns(3)
+            
+            with i1:
+                st.metric(
+                    "Conversion Rate", 
+                    f"{fut_conv:.1f}%", 
+                    delta=f"{fut_conv - curr_conv:.1f}% (Expected)",
+                    delta_color="normal"
+                )
+                st.caption(f"Current: {curr_conv:.1f}%")
+                
+            with i2:
+                st.metric(
+                    "Engagement Score", 
+                    f"{fut_eng:.1f}", 
+                    delta=f"{fut_eng - curr_eng:.1f} (Expected)",
+                    delta_color="normal"
+                )
+                st.caption(f"Current: {curr_eng:.1f}")
+                
+            with i3:
+                st.metric(
+                    "Projected CLV (Post-Rec)", 
+                    f"₹{fut_clv:,.0f}", 
+                    delta=f"₹{fut_clv - projected_clv:,.0f} (Expected)",
+                    delta_color="normal"
+                )
+                st.caption(f"Baseline: ₹{projected_clv:,.0f}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
     else:
         st.info("Select a user to see personalized CLV insights.")
 
@@ -1136,6 +1193,83 @@ with tab4:
     else:
         st.warning("No segments visible with current filters.")
 
+    # --- Overall Segment Impact Analysis ---
+    if not seg_users.empty:
+        st.markdown("---")
+        
+        # Determine Target Group: Entire Filtered Segment OR Specific Persona Group
+        target_group = seg_users
+        analysis_title = "Overall Segment Impact Analysis"
+        analysis_desc = "Projected performance uplift for the **entire filtered segment** after implementing recommendations:"
+        
+        if selected_user:
+            # If a user is selected, focus on their specific persona segment
+            u_persona = u["persona"] # 'u' is defined in the selected_user block above
+            target_group = seg_users[seg_users["persona"] == u_persona]
+            analysis_title = f"Impact Analysis: {u_persona} Segment"
+            analysis_desc = f"Projected performance uplift for all **{u_persona}** users in the current view:"
+            
+        st.markdown(f"### 📊 {analysis_title}")
+        st.markdown(analysis_desc)
+        
+        if not target_group.empty:
+            # 1. Aggregate Current Metrics
+            # Filter activity_df for users in the target group
+            current_seg_ids = target_group["user_id"].unique()
+            seg_acts = activity_df[activity_df["user_id"].isin(current_seg_ids)]
+            
+            total_views = seg_acts["views"].sum()
+            total_purchases = seg_acts["purchase_count"].sum()
+            
+            # Recalculate revenue accurately
+            total_revenue = target_group["total_spend"].sum()
+        
+        avg_conv = (total_purchases / total_views * 100) if total_views > 0 else 0
+        avg_eng = seg_acts["engagement_score"].mean() if "engagement_score" in seg_acts.columns else 0
+        
+        # 2. Simulate Future Metrics (Conservative Lift for Aggregate)
+        # Aggregate lift is usually more stable/conservative than individual
+        agg_lift_conv = random.uniform(1.10, 1.20) # 10-20% lift
+        agg_lift_eng = random.uniform(1.05, 1.15)  # 5-15% lift
+        agg_lift_rev = random.uniform(1.12, 1.25)  # 12-25% lift
+        
+        fut_avg_conv = min(avg_conv * agg_lift_conv, 100.0)
+        fut_avg_eng = min(avg_eng * agg_lift_eng, 10.0)
+        fut_total_rev = total_revenue * agg_lift_rev
+        
+        # 3. Display Metrics
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        k1, k2, k3 = st.columns(3)
+        
+        with k1:
+            st.metric(
+                "Avg Conversion Rate", 
+                f"{fut_avg_conv:.1f}%", 
+                delta=f"{fut_avg_conv - avg_conv:.1f}%",
+                delta_color="normal"
+            )
+            st.caption(f"Baseline: {avg_conv:.1f}%")
+            
+        with k2:
+            st.metric(
+                "Avg Engagement Score", 
+                f"{fut_avg_eng:.2f}", 
+                delta=f"{fut_avg_eng - avg_eng:.2f}",
+                delta_color="normal"
+            )
+            st.caption(f"Baseline: {avg_eng:.2f}")
+            
+        with k3:
+            st.metric(
+                "Total Segment Revenue", 
+                f"₹{fut_total_rev:,.0f}", 
+                delta=f"₹{fut_total_rev - total_revenue:,.0f}",
+                delta_color="normal"
+            )
+            st.caption(f"Current: ₹{total_revenue:,.0f}")
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+
 # ======================================================================
 # PAGE 5: PRODUCT PORTFOLIO
 # ======================================================================
@@ -1151,7 +1285,7 @@ with tab5:
     st.markdown("##### 🌿 Collections")
     cols = st.columns(len(collections))
     for i, coll in enumerate(collections):
-        if cols[i].button(coll, key=f"coll_btn_{i}", use_container_width=True):
+        if cols[i].button(coll, key=f"coll_btn_{i}", width="stretch"):
             st.session_state.selected_collection = coll
     
     st.markdown("---")
