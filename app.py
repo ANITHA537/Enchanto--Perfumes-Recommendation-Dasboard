@@ -20,97 +20,34 @@ st.set_page_config(page_title="Enchanto Recommendations", layout="wide")
 # ----------------------------------------------------------------------
 st.markdown("""
 <style>
-    /* Main Background - Reverted to Default (White) */
     .stApp {
         background-color: #ffffff;
     }
-    
-    /* Reduce Top Padding */
-    .block-container {
-        padding-top: 4rem;
-        padding-bottom: 1rem;
-    }
-    
-    /* Reduce Header Margins */
-    h1, h2, h3 {
-        margin-top: 0 !important;
-        margin-bottom: 0.5rem !important;
-    }
-    
-    /* Sidebar - Neutral Theme */
-    [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #e2e8f0;
-    }
+    .block-container { padding-top: 4rem; padding-bottom: 1rem; }
+    h1, h2, h3 { margin-top: 0 !important; margin-bottom: 0.5rem !important; }
+    [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e2e8f0; }
 
-    /* Standard Cards for Main Area (Clean White) */
     .glass-card {
         background: #ffffff;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        padding: 15px;
-        margin-bottom: 15px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        padding: 15px; margin-bottom: 15px;
         transition: transform 0.2s;
     }
-    .glass-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
+    .glass-card:hover { transform: translateY(-2px); }
 
-    /* Product Card Styling */
-    .rec-img {
-        border-radius: 12px;
-        margin-bottom: 8px;
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-    }
-    .rec-title {
-        font-weight: 700;
-        font-size: 1rem;
-        color: #1e293b;
-        margin-bottom: 4px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .rec-price {
-        font-weight: 800;
-        font-size: 1.1rem;
-        color: #0f766e;
-    }
-    .rec-tag {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 99px;
-        background: #ecfdf5;
-        color: #047857;
-        font-size: 0.7rem;
-        margin-top: 4px;
-        font-weight: 600;
-    }
-    
-    /* Headers */
-    h1, h2, h3 {
-        color: #1e293b !important;
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-    
-    /* Metrics */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
-    }
+    .rec-img { border-radius: 12px; margin-bottom: 8px; width: 100%; height: 200px; object-fit: cover; }
+    .rec-title { font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rec-price { font-weight: 800; font-size: 1.1rem; color: #0f766e; }
+    .rec-tag { display: inline-block; padding: 4px 10px; border-radius: 99px; background: #ecfdf5; color: #047857; font-size: 0.7rem; margin-top: 4px; font-weight: 600; }
 
-    /* Justified Tabs */
-    button[data-baseweb="tab"] {
-        flex-grow: 1;
-    }
-    
-    /* Sky Blue View Buttons */
+    div[data-testid="stMetricValue"] { font-size: 1.8rem !important; }
+    button[data-baseweb="tab"] { flex-grow: 1; }
+
     div[data-testid="stButton"] > button {
-        background-color: #87CEEB !important; /* Sky Blue */
-        color: #0f172a !important; /* Dark Slate for contrast */
+        background-color: #87CEEB !important;
+        color: #0f172a !important;
         border: 1px solid #7dd3fc !important;
         font-weight: 500 !important;
     }
@@ -118,8 +55,28 @@ st.markdown("""
         background-color: #38bdf8 !important;
         color: #ffffff !important;
     }
+
+    /* ---------------------- GOLDEN MULTISELECT TAGS ---------------------- */
+    div[data-baseweb="tag"] {
+        background-color: #D4AF37 !important;
+        color: #3C2F00 !important;
+        border-radius: 6px !important;
+        border: 1px solid #b8922b !important;
+        font-weight: 600 !important;
+    }
+    div[data-baseweb="tag"] svg { fill: #3C2F00 !important; }
+    div[data-baseweb="tag"]:hover {
+        background-color: #E2C15F !important;
+        color: #2b2200 !important;
+    }
+    div[data-baseweb="tag"] > div {
+        font-size: 0.78rem !important;
+        padding-top: 1px;
+        padding-bottom: 1px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
 
 # ======================================================================
 # HEADER
@@ -1016,3 +973,4 @@ with tab5:
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No products match your filters.")
+
